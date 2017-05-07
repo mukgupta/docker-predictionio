@@ -26,17 +26,12 @@ RUN add-apt-repository ppa:webupd8team/java -y && \
     rm -r /var/cache/oracle-jdk8-installer
 ENV JAVA_HOME /usr/lib/jvm/java-8-oracle
 
-
 #Spark
 RUN wget -O - http://d3kbcqa49mib13.cloudfront.net/spark-1.5.1-bin-hadoop2.6.tgz | tar zx
 RUN mv /spark* /spark
 
-#ElasticSearch
-RUN wget -O - https://download.elasticsearch.org/elasticsearch/elasticsearch/elasticsearch-1.4.4.tar.gz | tar zx
-RUN mv /elasticsearch* /elasticsearch
-
 #HBase
-RUN wget -O - http://archive.apache.org/dist/hbase/hbase-1.0.0/hbase-1.0.0-bin.tar.gz  | tar zx
+RUN wget -O - http://archive.apache.org/dist/hbase/1.2.5/hbase-1.2.5-bin.tar.gz  | tar zx
 RUN mv /hbase* /hbase
 RUN echo "export JAVA_HOME=/usr/lib/jvm/java-8-oracle" >> /hbase/conf/hbase-env.sh 
 
@@ -48,18 +43,19 @@ RUN pip install predictionio
 #For Spark MLlib
 RUN apt-get install -y libgfortran3 libatlas3-base libopenblas-base
 
+#ElasticSearch
+RUN wget -O - https://download.elasticsearch.org/elasticsearch/elasticsearch/elasticsearch-1.7.5.tar.gz | tar zx
+RUN mv /elasticsearch* /elasticsearch
 #PredictionIO
-RUN wget -O - http://www-us.apache.org/dist/incubator/predictionio/0.10.0-incubating/apache-predictionio-0.10.0-incubating.tar.gz | tar zx && \
+RUN wget http://www-us.apache.org/dist/incubator/predictionio/0.11.0-incubating/apache-predictionio-0.11.0-incubating.tar.gz && mkdir apache-predictionio-0.11.0-incubating && tar -xvzf apache-predictionio-0.11.0-incubating.tar.gz -C apache-predictionio-0.11.0-incubating && \
     cd apache-predictionio* && \
-    ./make-distribution.sh && \
-    tar zxvf PredictionIO-0.10.0-incubating.tar.gz && \
+    ./make-distribution.sh -Delasticsearch.version=1.7.5 && \
+    tar zxvf PredictionIO-0.11.0-incubating.tar.gz && \
     rm *gz && \
     mv PredictionIO* /PredictionIO
 ENV PIO_HOME /PredictionIO
 ENV PATH $PATH:$PIO_HOME/bin
 
-#Download SBT
-#RUN /PredictionIO/sbt/sbt package 
 
 #Configuration
 RUN sed -i 's|SPARK_HOME=.*|SPARK_HOME=/spark|' /PredictionIO/conf/pio-env.sh
@@ -82,3 +78,15 @@ COPY quickstartapp quickstartapp
 COPY sv /etc/service 
 ARG BUILD_INFO
 LABEL BUILD_INFO=$BUILD_INFO
+
+
+RUN apt-get install maven -y
+RUN pip install datetime
+
+#mahout
+RUN git clone https://github.com/apache/mahout.git mahout && \
+cd mahout && git checkout 00a2883ec69b0807a5486c61dfcc7ef27f35ddc6  && \
+mvn clean install -DskipTests
+
+RUN git clone https://github.com/actionml/universal-recommender.git ~/ur
+RUN cd ~/ur && git checkout develop # or whatever tagged release you want, read below
